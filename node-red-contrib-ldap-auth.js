@@ -13,10 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  **/
-var when = require("when");
-var mustache = require("mustache");
-var ldapjs = require("ldapjs");
 
+const { render } = require ("mustache");
+const { createClient } = require ( "ldapjs");
 
 var filterTemplate = '';
 var ldap_bind_dn = null;
@@ -33,53 +32,53 @@ var searchOpts = {
 };
 
 module.exports = {
-	setup: function(args) {
+	setup: function(args){
 		options.url = args.uri;
 		searchOpts.base = args.base;
 		filterTemplate = args.filterTemplate;
-		if(args.bind_dn) {
+		if (args.bind_dn) {
 			ldap_bind_dn = args.bind_dn;
 			ldap_bind_pw = args.bind_pw;
 		}
-		if(args.no_verify_ssl) {
-			options.tlsOptions= {
+		if (args.no_verify_ssl) {
+			options.tlsOptions = {
 				'rejectUnauthorized': false,
 			};
 		}
-        if(args.anon_read) {
-            anon_read = args.anon_read;
-        }
+		if (args.anon_read) {
+			anon_read = args.anon_read;
+		}
 		return this;
 	},
 	type: "credentials",
-	users: function(username) {
-		return when.promise(function(resolve) {
-			var ldap = ldapjs.createClient(options);
+	users: function(username1) {
+		return new Promise(function(resolve) {
+			var ldap = createClient(options);
 			ldap.on('error', err => {
 				console.error(err);
 				resolve(null);
 			});
-			var fn = function(err) {
+			var fn = function (err) {
 				if (err) {
 					resolve(null);
 					ldap.unbind();
 				}
 				var temp = {};
-				temp.username = username;
-				searchOpts.filter = mustache.render(filterTemplate, temp);
-				ldap.search(searchOpts.base,searchOpts,function(err, res){
+				temp.username = username1;
+				searchOpts.filter = render(filterTemplate, temp);
+				ldap.search(searchOpts.base, searchOpts, function (err, res) {
 					var found = false;
 					if (err) {
 						console.log(err);
 						resolve(null);
 						ldap.unbind();
 					} else {
-						res.on('searchEntry', function(entry){
+						res.on('searchEntry', function (entry) {
 							found = true;
-							resolve({ username: username, permissions: "*" });
+							resolve({ username: username1, permissions: "*" });
 							ldap.unbind();
 						});
-						res.on('end', function(status) {
+						res.on('end', function (status) {
 							if (!found) {
 								resolve(null);
 								ldap.unbind();
@@ -88,7 +87,7 @@ module.exports = {
 					}
 				});
 			};
-			if(ldap_bind_dn) {
+			if (ldap_bind_dn) {
 				ldap.bind(ldap_bind_dn, ldap_bind_pw, fn);
 			}
 			else {
@@ -96,33 +95,37 @@ module.exports = {
 			}
 		});
 	},
-	authenticate: function(username, password) {
-		return when.promise(function(resolve) {
-			var ldap = ldapjs.createClient(options);
+	authenticate: function(username1,password) {
+		return new Promise(function(resolve) {
+			
+			var ldap = createClient(options);
+			
 			ldap.on('error', err => {
 				console.error(err);
 				resolve(null);
 			});
-			var fn = function(err) {
+			var fn = function (err) {
 				if (err) {
 					resolve(null);
 					ldap.unbind();
 				}
 				var temp = {};
-				temp.username = username;
-				searchOpts.filter = mustache.render(filterTemplate, temp);
-				ldap.search(searchOpts.base,searchOpts,function(err, res){
+				temp.username = username1;
+				searchOpts.filter = render(filterTemplate, temp);
+			
+				ldap.search(searchOpts.base, searchOpts, function (err, res) {
 					var found = false;
 					if (err) {
 						console.log(err);
 						resolve(null);
 						ldap.unbind();
 					} else {
-						res.on('searchEntry', function(entry){
+						res.on('searchEntry', function (entry) {
 							found = true;
-							ldap.bind(entry.dn, password, function(err){
+							console.log("found Users: " + entry.pojo);
+							ldap.bind(entry.dn, password, function (err) {
 								if (!err) {
-									resolve({ username: username, permissions: "*" });
+									resolve({ username: username1, permissions: "*" });
 									ldap.unbind();
 								} else {
 									resolve(null);
@@ -130,7 +133,7 @@ module.exports = {
 								}
 							});
 						});
-						res.on('end', function(status){
+						res.on('end', function (status) {
 							if (!found) {
 								resolve(null);
 								ldap.unbind();
@@ -139,7 +142,7 @@ module.exports = {
 					}
 				});
 			};
-			if(ldap_bind_dn) {
+			if (ldap_bind_dn) {
 				ldap.bind(ldap_bind_dn, ldap_bind_pw, fn);
 			}
 			else {
@@ -148,14 +151,16 @@ module.exports = {
 		});
 	},
 	default: function() {
-        return when.promise(function(resolve) {
-            // Resolve with the user object for the default user.
-            // If no default user exists, resolve with null.
-            if (anon_read) {
-                resolve({anonymous: true, permissions:"read"});
-            } else {
-                resolve(null);
-            }
-        });
-    }
-};
+		return new Promise(function(resolve) {
+			// Resolve with the user object for the default user.
+			// If no default user exists, resolve with null.
+			//resolve({anonymous: true, permissions:"read"});
+			if (anon_read) {
+				resolve({ anonymous: true, permissions: "read" });
+			} else {
+				resolve(null);
+			}
+		});
+	}
+ }
+
